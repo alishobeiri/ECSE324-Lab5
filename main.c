@@ -13,6 +13,7 @@
 int time = 0;
 // Order of frequency:    A        S        D        F        J        K        L        ;
 double frequencies[8] = {130.813, 146.832, 164.814, 174.614, 195.998, 220.000, 246.942, 261.626};
+int period[8] = {367, 327, 291, 275, 245, 218, 194, 184};
 int keyPressed[8] = {0};
 
 int volume = 1;
@@ -37,22 +38,22 @@ int main() {
 		readKeyboard();
 		int signalValue = makeSound();
 
-		// We draw a point on the screen every 120 us
-		if(time % 8 == 0){ 
+		if(time % 12 == 0){ 
 
 			// xVal holds the x location of the pixel we want to draw, max x value is 319
 			xVal = (xVal + 1) % 320;
 			
-
+			// clear pixel at the given x position
 			VGA_draw_point_ASM(xVal, lastPixelYAtDispX[xVal], 0x00);
 			
-			//The y value must have an offset of 240/2 = 120, and scaling down arbitrary by 2^18 to fits on screen.
+			// tranform signal value to a y_position on the screen (i.e. on the middle)
 			yVal = 120 - (signalValue >> 20);	
-			//insert the New pixel
-			VGA_draw_point_ASM(xVal, yVal, xVal*5); 
+
+			//draw the new updated
+			VGA_draw_point_ASM(xVal, yVal, 0xf44242 - yVal*5); 
 			
+			// update the stored y value for this x position
 			lastPixelYAtDispX[xVal] = yVal;
-			//writeVolume(volume);
 		}		
 	}
 
@@ -62,22 +63,23 @@ int main() {
 
 int makeSound() {
 	int signal = 0;
-	int i;
-	
-	for (i = 0; i < 8; i++) {
-		if(keyPressed[i]) {
-			signal += getSignal(frequencies[i], time);
-		}
-	}
 
 	if (hps_tim0_int_flag) {
 		hps_tim0_int_flag = 0;
+
+		int i;
+	
+		for (i = 0; i < 8; i++) {
+			if(keyPressed[i]) {
+				signal += getSignal(frequencies[i], time%period[i]);
+			}
+		}
 
 		while(audio_write_data_ASM(signal, signal) == 0) {}
 
 		time += 1;
 		if (time == 48000) {
-			// time = 0;
+			time = 0;
 		}
 	}
 			
@@ -145,7 +147,7 @@ int getSignal(double frequency, double time) {
 
 void setupTimer() {
 	// Sampling timer
-	int_setup(2, (int[]){199});
+	int_setup(1, (int[]){199});
 
 	HPS_TIM_config_t hps_time0;
 
